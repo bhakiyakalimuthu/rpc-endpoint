@@ -33,13 +33,9 @@ type RpcRequest struct {
 	relaySigningKey *ecdsa.PrivateKey
 
 	// extracted during request lifecycle:
-	origin   string
-	ip       string
-	body     []byte
-	jsonReq  *types.JsonRpcRequest
-	rawTxHex string
-	tx       *ethtypes.Transaction
-	txFrom   string
+	origin string
+	ip     string
+	body   []byte
 
 	// response flags
 	respHeaderContentTypeWritten bool
@@ -134,23 +130,43 @@ func (r *RpcRequest) process() {
 
 	// Parse JSON RPC
 	if err = json.Unmarshal(r.body, &r.jsonReq); err != nil {
-		r.log("failed to parse JSON RPC request: %v - body: %s", err, r.body)
-		r.writeHeaderStatus(http.StatusBadRequest)
+		// TODO: check if body is an array of requests
+		var requests []*types.JsonRpcRequest = make([]*types.JsonRpcRequest, 0)
+		if err = json.Unmarshal(r.body, &requests); err != nil {
+			r.log("failed to parse JSON RPC request: %v - body: %s", err, r.body)
+			r.writeHeaderStatus(http.StatusBadRequest)
+			return
+		}
+
+		for _, req := range requests {
+			r._processSingleRequest(req)
+		}
 		return
 	}
 
-	r.log("JSON-RPC method: %s ip: %s", r.jsonReq.Method, r.ip)
+	r._processSingleRequest(r.jsonReq)
+}
 
-	if r.jsonReq.Method == "eth_sendRawTransaction" {
-		r.handle_sendRawTransaction()
+func (r *RpcRequest) _processSingleRequest(jsonReq *types.JsonRpcRequest) {
+	r.log("JSON-RPC method: %s ip: %s", jsonReq.Method, r.ip)
+
+	if jsonReq.Method == "eth_sendRawTransaction" {
+		if len(r.jsonReq.Params) < 1 {
+			r.logError("no params for eth_sendRawTransaction")
+			r.writeHeaderStatus(http.StatusBadRequest)
+			return
+		}
+
+		rawTxHex := jsonReq.Params[0].(string)
+		r.handle_sendRawTransaction(rawTxHex)
 
 	} else {
 		// Normal proxy mode. Check for intercepts
-		if r.jsonReq.Method == "eth_getTransactionCount" && r.intercept_mm_eth_getTransactionCount() { // intercept if MM needs to show an error to user
+		if jsonReq.Method == "eth_getTransactionCount" && r.intercept_mm_eth_getTransactionCount() { // intercept if MM needs to show an error to user
 			return
-		} else if r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract() { // intercept if Flashbots isRPC contract
+		} else if jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract() { // intercept if Flashbots isRPC contract
 			return
-		} else if r.jsonReq.Method == "net_version" { // don't need to proxy to node, it's always 1 (mainnet)
+		} else if jsonReq.Method == "net_version" { // don't need to proxy to node, it's always 1 (mainnet)
 			r.writeRpcResult("1")
 			return
 		}
@@ -159,7 +175,7 @@ func (r *RpcRequest) process() {
 		readJsonRpcSuccess, proxyHttpStatus, jsonResp := r.proxyRequestRead(r.defaultProxyUrl)
 
 		// After proxy, perhaps check backend [MM fix #3 step 2]
-		if r.jsonReq.Method == "eth_getTransactionReceipt" {
+		if jsonReq.Method == "eth_getTransactionReceipt" {
 			requestCompleted := r.check_post_getTransactionReceipt(jsonResp)
 			if requestCompleted {
 				return
@@ -171,25 +187,17 @@ func (r *RpcRequest) process() {
 			r.writeHeaderContentTypeJson()
 			r.writeHeaderStatus(proxyHttpStatus)
 			r._writeRpcResponse(jsonResp)
-			r.log("Proxy to node successful: %s", r.jsonReq.Method)
+			r.log("Proxy to node successful: %s", jsonReq.Method)
 		} else {
 			r.writeHeaderStatus(http.StatusInternalServerError)
-			r.log("Proxy to node failed: %s", r.jsonReq.Method)
+			r.log("Proxy to node failed: %s", jsonReq.Method)
 		}
 	}
 }
 
-func (r *RpcRequest) handle_sendRawTransaction() {
+func (r *RpcRequest) handle_sendRawTransaction(rawTx string) {
 	var err error
 
-	// JSON-RPC sanity checks
-	if len(r.jsonReq.Params) < 1 {
-		r.logError("no params for eth_sendRawTransaction")
-		r.writeHeaderStatus(http.StatusBadRequest)
-		return
-	}
-
-	r.rawTxHex = r.jsonReq.Params[0].(string)
 	if len(r.rawTxHex) < 2 {
 		r.logError("invalid raw transaction (wrong length)")
 		r.writeHeaderStatus(http.StatusBadRequest)
