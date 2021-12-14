@@ -135,6 +135,9 @@ func (r *RpcRequest) process() {
 		} else if r.jsonReq.Method == "net_version" { // don't need to proxy to node, it's always 1 (mainnet)
 			r.writeRpcResult("1")
 			return
+		} else if r.isWhitehatBundleCollection && r.jsonReq.Method == "eth_getBalance" {
+			r.writeRpcResult("0xde0b6b3a7640000") // 1 eth in gwei
+			return
 		}
 
 		// Proxy the request to a node
