@@ -195,6 +195,11 @@ func (s *RedisState) AddTxToWhitehatBundle(bundleId string, signedTx string) err
 	return err
 }
 
+func (s *RedisState) GetWhitehatBundleTx(bundleId string) ([]string, error) {
+	key := RedisKeyWhitehatBundleTransactions(bundleId)
+	return s.RedisClient.LRange(context.Background(), key, 0, -1).Result()
+}
+
 //
 // Enable lookup of last txHash sent by txFrom
 //
