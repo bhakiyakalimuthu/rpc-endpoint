@@ -30,8 +30,8 @@ var RedisPrefixSenderOfTxHash = RedisPrefix + "txsender-of-txhash:"
 var RedisExpirySenderOfTxHash = time.Duration(24 * time.Hour) // 1 day
 
 // Enable lookup of bundle txs by bundleId
-var RedisPrefixBundleTransactions = RedisPrefix + "cached-tx-for-bundle-id:"
-var RedisExpiryBundleTransactions = time.Duration(24 * time.Hour) // 1 day
+var RedisPrefixWhitehatBundleTransactions = RedisPrefix + "tx-for-whitehat-bundle:"
+var RedisExpiryWhitehatBundleTransactions = time.Duration(24 * time.Hour) // 1 day
 
 // // Enable lookup of last privateTransaction-txHash sent by txFrom
 // var RedisPrefixLastPrivTxHashOfAccount = RedisPrefix + "last-txhash-of-txsender:"
@@ -53,8 +53,8 @@ func RedisKeySenderOfTxHash(txHash string) string {
 	return RedisPrefixSenderOfTxHash + strings.ToLower(txHash)
 }
 
-func RedisKeyBundleTransactions(bundleId string) string {
-	return RedisPrefixBundleTransactions + strings.ToLower(bundleId)
+func RedisKeyWhitehatBundleTransactions(bundleId string) string {
+	return RedisPrefixWhitehatBundleTransactions + strings.ToLower(bundleId)
 }
 
 // func RedisKeyLastPrivTxHashOfAccount(txFrom string) string {
@@ -183,9 +183,15 @@ func (s *RedisState) GetSenderOfTxHash(txHash string) (txSender string, found bo
 //
 // Enable lookup of tx bundles by bundle ID
 //
-func (s *RedisState) AddTxToBundle(bundleId string, signedTx string) error {
-	key := RedisKeyBundleTransactions(bundleId)
-	err := s.RedisClient.LPush(context.Background(), key, signedTx, RedisExpiryBundleTransactions).Err()
+func (s *RedisState) AddTxToWhitehatBundle(bundleId string, signedTx string) error {
+	key := RedisKeyWhitehatBundleTransactions(bundleId)
+	err := s.RedisClient.LPush(context.Background(), key, signedTx, RedisExpiryWhitehatBundleTransactions).Err()
+	if err != nil {
+		return err
+	}
+
+	// Limit to 15 entries
+	err = s.RedisClient.LTrim(context.Background(), key, 0, 15).Err()
 	return err
 }
 

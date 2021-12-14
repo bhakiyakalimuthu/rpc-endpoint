@@ -44,6 +44,9 @@ type RpcRequest struct {
 	respHeaderContentTypeWritten bool
 	respHeaderStatusCodeWritten  bool
 	respBodyWritten              bool
+
+	isWhitehatBundleCollection bool
+	whitehatBundleId           string
 }
 
 func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, relaySigningKey *ecdsa.PrivateKey) *RpcRequest {
@@ -75,6 +78,9 @@ func (r *RpcRequest) process() {
 		timeRequestNeeded := time.Since(r.timeStarted)
 		r.log("request took %.6f sec", timeRequestNeeded.Seconds())
 	}()
+
+	r.whitehatBundleId = r.req.URL.Query().Get("bundle")
+	r.isWhitehatBundleCollection = r.whitehatBundleId != ""
 
 	r.ip = utils.GetIP(r.req)
 	r.origin = r.req.Header.Get("Origin")

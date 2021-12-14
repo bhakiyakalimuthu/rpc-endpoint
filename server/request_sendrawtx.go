@@ -70,10 +70,11 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	needsProtection := r.doesTxNeedFrontrunningProtection(r.tx)
 
 	// If users specify a bundle ID, cache this transaction
-	if cacheId := r.req.URL.Query().Get("bundle-id"); cacheId != "" {
-		r.log("caching tx to bundle %s txData: %s", cacheId, r.rawTxHex)
-		RState.AddTxToBundle(cacheId, r.rawTxHex)
-		// return // TODO: return a fake confirmation // note(chris): should the TX NOT be sent?
+	if r.isWhitehatBundleCollection {
+		r.log("[WhitehatBundleCollection] adding tx to bundle %s txData: %s", r.whitehatBundleId, r.rawTxHex)
+		RState.AddTxToWhitehatBundle(r.whitehatBundleId, r.rawTxHex)
+		r.writeRpcResult(r.tx.Hash().Hex())
+		return
 	}
 
 	// Check for cancellation-tx
