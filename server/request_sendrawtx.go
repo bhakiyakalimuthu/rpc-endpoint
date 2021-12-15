@@ -72,7 +72,10 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	// If users specify a bundle ID, cache this transaction
 	if r.isWhitehatBundleCollection {
 		r.log("[WhitehatBundleCollection] adding tx to bundle %s txData: %s", r.whitehatBundleId, r.rawTxHex)
-		RState.AddTxToWhitehatBundle(r.whitehatBundleId, r.rawTxHex)
+		err = RState.AddTxToWhitehatBundle(r.whitehatBundleId, r.rawTxHex)
+		if err != nil {
+			r.logError("[WhitehatBundleCollection] AddTxToWhitehatBundle failed:", err)
+		}
 		r.writeRpcResult(r.tx.Hash().Hex())
 		return
 	}
