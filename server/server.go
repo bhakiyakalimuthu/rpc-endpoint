@@ -91,6 +91,7 @@ func (s *RpcEndPointServer) Start() {
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
 	http.HandleFunc("/", http.HandlerFunc(s.HandleHttpRequest))
 	http.HandleFunc("/health", http.HandlerFunc(s.handleHealthRequest))
+	http.HandleFunc("/bundle", http.HandlerFunc(s.HandleBundleRequest))
 
 	// Start serving
 	if err := http.ListenAndServe(s.listenAddress, nil); err != nil {
@@ -126,6 +127,33 @@ func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *
 	jsonResp, err := json.Marshal(res)
 	if err != nil {
 		log.Println("healthCheck json error:", err)
+		respw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	respw.Header().Set("Content-Type", "application/json")
+	respw.WriteHeader(http.StatusOK)
+	respw.Write(jsonResp)
+}
+
+func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *http.Request) {
+	bundleId := req.URL.Query().Get("id")
+
+	txn, err := RState.GetWhitehatBundleTx(bundleId)
+	if err != nil {
+		log.Printf("[handleBundleRequest] ERROR: GetWhitehatBundleTx for %s failed: %v\n", bundleId, err)
+		respw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	res := types.BundleResponse{
+		BundleId: bundleId,
+		RawTxn:   txn,
+	}
+
+	jsonResp, err := json.Marshal(res)
+	if err != nil {
+		log.Println("[handleBundleRequest] ERROR json marshal failed:", err)
 		respw.WriteHeader(http.StatusInternalServerError)
 		return
 	}

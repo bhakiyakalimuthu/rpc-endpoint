@@ -45,6 +45,9 @@ type RpcRequest struct {
 	respHeaderContentTypeWritten bool
 	respHeaderStatusCodeWritten  bool
 	respBodyWritten              bool
+
+	isWhitehatBundleCollection bool
+	whitehatBundleId           string
 }
 
 func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, relaySigningKey *ecdsa.PrivateKey) *RpcRequest {
@@ -76,6 +79,9 @@ func (r *RpcRequest) process() {
 		timeRequestNeeded := time.Since(r.timeStarted)
 		r.log("request took %.6f sec", timeRequestNeeded.Seconds())
 	}()
+
+	r.whitehatBundleId = r.req.URL.Query().Get("bundle")
+	r.isWhitehatBundleCollection = r.whitehatBundleId != ""
 
 	r.ip = utils.GetIP(r.req)
 	r.origin = r.req.Header.Get("Origin")
@@ -129,6 +135,9 @@ func (r *RpcRequest) process() {
 			return
 		} else if r.jsonReq.Method == "net_version" { // don't need to proxy to node, it's always 1 (mainnet)
 			r.writeRpcResult("1")
+			return
+		} else if r.isWhitehatBundleCollection && r.jsonReq.Method == "eth_getBalance" {
+			r.writeRpcResult("0xde0b6b3a7640000") // 1 eth in gwei
 			return
 		}
 
