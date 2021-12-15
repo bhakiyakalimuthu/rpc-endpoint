@@ -91,5 +91,5 @@ type RelayErrorResponse struct {
 
 type BundleResponse struct {
 	BundleId string   `json:"bundleId"`
-	RawTxn   []string `json:"rawTxn"`
+	RawTxs   []string `json:"rawTxs"`
 }

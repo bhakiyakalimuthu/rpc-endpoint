@@ -369,9 +369,9 @@ func TestWhitehatBundleCollection(t *testing.T) {
 	require.Nil(t, testutils.MockBackendLastJsonRpcRequest)
 
 	// Check redis
-	txn, err := server.RState.GetWhitehatBundleTx(bundleId)
+	txs, err := server.RState.GetWhitehatBundleTx(bundleId)
 	require.Nil(t, err, err)
-	require.Equal(t, 1, len(txn))
+	require.Equal(t, 1, len(txs))
 
 	// Send again (#2)
 	resp, err = utils.SendRpcAndParseResponseTo(url, req_sendRawTransaction)
@@ -379,9 +379,9 @@ func TestWhitehatBundleCollection(t *testing.T) {
 	require.Nil(t, resp.Error, resp.Error)
 
 	// Check redis (#2)
-	txn, err = server.RState.GetWhitehatBundleTx(bundleId)
+	txs, err = server.RState.GetWhitehatBundleTx(bundleId)
 	require.Nil(t, err, err)
-	require.Equal(t, 2, len(txn))
+	require.Equal(t, 2, len(txs))
 
 	// Check JSON API
 	jsonApiUrl := bundleJsonApi.URL + "/bundle?id=" + bundleId
@@ -395,7 +395,7 @@ func TestWhitehatBundleCollection(t *testing.T) {
 	err = json.Unmarshal(body, bundleResponse)
 	require.Nil(t, err, err)
 	require.Equal(t, bundleId, bundleResponse.BundleId)
-	require.Equal(t, 2, len(bundleResponse.RawTxn))
+	require.Equal(t, 2, len(bundleResponse.RawTxs))
 }
 
 func TestWhitehatBundleCollectionGetBalance(t *testing.T) {

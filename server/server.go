@@ -139,7 +139,7 @@ func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *
 func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *http.Request) {
 	bundleId := req.URL.Query().Get("id")
 
-	txn, err := RState.GetWhitehatBundleTx(bundleId)
+	txs, err := RState.GetWhitehatBundleTx(bundleId)
 	if err != nil {
 		log.Printf("[handleBundleRequest] ERROR: GetWhitehatBundleTx for %s failed: %v\n", bundleId, err)
 		respw.WriteHeader(http.StatusInternalServerError)
@@ -148,7 +148,7 @@ func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *
 
 	res := types.BundleResponse{
 		BundleId: bundleId,
-		RawTxn:   txn,
+		RawTxs:   txs,
 	}
 
 	jsonResp, err := json.Marshal(res)
