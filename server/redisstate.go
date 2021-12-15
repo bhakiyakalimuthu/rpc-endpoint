@@ -193,7 +193,15 @@ func (s *RedisState) GetSenderOfTxHash(txHash string) (txSender string, found bo
 //
 func (s *RedisState) AddTxToWhitehatBundle(bundleId string, signedTx string) error {
 	key := RedisKeyWhitehatBundleTransactions(bundleId)
-	err := s.RedisClient.LPush(context.Background(), key, signedTx, RedisExpiryWhitehatBundleTransactions).Err()
+
+	// Add item
+	err := s.RedisClient.LPush(context.Background(), key, signedTx).Err()
+	if err != nil {
+		return err
+	}
+
+	// Set expiry
+	err = s.RedisClient.Expire(context.Background(), key, RedisExpiryWhitehatBundleTransactions).Err()
 	if err != nil {
 		return err
 	}
