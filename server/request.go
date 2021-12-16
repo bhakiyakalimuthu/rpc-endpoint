@@ -12,6 +12,7 @@ import (
 	"log"
 	"math/big"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 
@@ -136,14 +137,11 @@ func (r *RpcRequest) process() {
 		} else if r.jsonReq.Method == "net_version" { // don't need to proxy to node, it's always 1 (mainnet)
 			r.writeRpcResult("1")
 			return
+		} else if r.isWhitehatBundleCollection && r.jsonReq.Method == "eth_call" { // whitehat rescue: fake a balance of 100 ETH by rewriting "to" for new BalanceChecker smart contract
+			r.WhitehatBalanceCheckerRewrite()
+
 		} else if r.isWhitehatBundleCollection && r.jsonReq.Method == "eth_getBalance" {
-			// set balance to 1337 + number of cached tx
-			balance := new(big.Int).Mul(big.NewInt(1337), big.NewInt(1e18))
-			txs, _ := RState.GetWhitehatBundleTx(r.whitehatBundleId)
-			addToBalance := new(big.Int).Mul(big.NewInt(int64(len(txs))), big.NewInt(1e16))
-			balance = new(big.Int).Add(balance, addToBalance)
-			balanceHex := fmt.Sprintf("0x%x", balance)
-			r.writeRpcResult(balanceHex)
+			r.writeRpcResult("0x56bc75e2d63100000") // 100 ETH, same as the eth_call SC call above returns
 			return
 		}
 
@@ -414,4 +412,29 @@ func (r *RpcRequest) GetAddressNonceRange(address string) (minNonce, maxNonce ui
 	_redisMaxNonce, _, _ := RState.GetSenderMaxNonce(r.txFrom)
 	maxNonce = Max(minNonce, _redisMaxNonce)
 	return minNonce, maxNonce
+}
+
+func (r *RpcRequest) WhitehatBalanceCheckerRewrite() {
+	var err error
+
+	if len(r.jsonReq.Params) == 0 {
+		return
+	}
+
+	// Ensure param is of type map
+	t := reflect.TypeOf(r.jsonReq.Params[0])
+	if t.Kind() != reflect.Map {
+		return
+	}
+
+	p := r.jsonReq.Params[0].(map[string]interface{})
+	if to := p["to"]; to == "0xb1f8e55c7f64d203c1400b9d8555d050f94adf39" {
+		r.jsonReq.Params[0].(map[string]interface{})["to"] = "0x268F7Cd7A396BCE178f0937095772C7fb83a9104"
+		r.body, err = json.Marshal(r.jsonReq)
+		if err != nil {
+			r.logError("isWhitehatBundleCollection json marshal failed:", err)
+		} else {
+			r.log("BalanceChecker contract was rewritten to new version")
+		}
+	}
 }
