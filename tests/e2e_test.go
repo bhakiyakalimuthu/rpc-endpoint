@@ -411,19 +411,5 @@ func TestWhitehatBundleCollectionGetBalance(t *testing.T) {
 	val := ""
 	err = json.Unmarshal(resp.Result, &val)
 	require.Nil(t, err, err)
-	require.Equal(t, "0x487a9a304539440000", val)
-
-	// send tx
-	req_sendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_BundleFailedTooManyTimes_RawTx})
-	resp, err = utils.SendRpcAndParseResponseTo(url, req_sendRawTransaction)
-	require.Nil(t, err, err)
-	require.Nil(t, resp.Error, resp.Error)
-
-	// get balance again, should be +0.01 ETH
-	resp, err = utils.SendRpcAndParseResponseTo(url, req_getTransactionCount)
-	require.Nil(t, err, err)
-	require.Nil(t, resp.Error, resp.Error)
-	err = json.Unmarshal(resp.Result, &val)
-	require.Nil(t, err, err)
-	require.Equal(t, "0x487abdb737a9050000", val)
+	require.Equal(t, "0x56bc75e2d63100000", val)
 }

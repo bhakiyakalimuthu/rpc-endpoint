@@ -92,7 +92,6 @@ func (s *RpcEndPointServer) Start() {
 	http.HandleFunc("/", http.HandlerFunc(s.HandleHttpRequest))
 	http.HandleFunc("/health", http.HandlerFunc(s.handleHealthRequest))
 	http.HandleFunc("/bundle", http.HandlerFunc(s.HandleBundleRequest))
-	http.HandleFunc("/bundle/reset", http.HandlerFunc(s.HandleBundleResetRequest))
 
 	// Start serving
 	if err := http.ListenAndServe(s.listenAddress, nil); err != nil {
@@ -137,47 +136,44 @@ func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *
 	respw.Write(jsonResp)
 }
 
-func (s *RpcEndPointServer) HandleBundleResetRequest(respw http.ResponseWriter, req *http.Request) {
-	if req.Method != "POST" {
-		respw.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
+func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *http.Request) {
 	bundleId := req.URL.Query().Get("id")
 	if bundleId == "" {
 		http.Error(respw, "no bundle id", http.StatusBadRequest)
 		return
 	}
 
-	RState.DelWhitehatBundleTx(bundleId)
-	respw.WriteHeader(http.StatusOK)
-}
+	if req.Method == "GET" {
+		txs, err := RState.GetWhitehatBundleTx(bundleId)
+		if err != nil {
+			log.Printf("[handleBundleRequest] ERROR: GetWhitehatBundleTx for %s failed: %v\n", bundleId, err)
+			respw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 
-func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *http.Request) {
-	bundleId := req.URL.Query().Get("id")
+		res := types.BundleResponse{
+			BundleId: bundleId,
+			RawTxs:   txs,
+		}
 
-	txs, err := RState.GetWhitehatBundleTx(bundleId)
-	if err != nil {
-		log.Printf("[handleBundleRequest] ERROR: GetWhitehatBundleTx for %s failed: %v\n", bundleId, err)
-		respw.WriteHeader(http.StatusInternalServerError)
-		return
+		jsonResp, err := json.Marshal(res)
+		if err != nil {
+			log.Println("[handleBundleRequest] ERROR json marshal failed:", err)
+			respw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		respw.Header().Set("Content-Type", "application/json")
+		respw.WriteHeader(http.StatusOK)
+		respw.Write(jsonResp)
+
+	} else if req.Method == "POST" {
+		RState.DelWhitehatBundleTx(bundleId)
+		respw.WriteHeader(http.StatusOK)
+
+	} else {
+		respw.WriteHeader(http.StatusMethodNotAllowed)
 	}
-
-	res := types.BundleResponse{
-		BundleId: bundleId,
-		RawTxs:   txs,
-	}
-
-	jsonResp, err := json.Marshal(res)
-	if err != nil {
-		log.Println("[handleBundleRequest] ERROR json marshal failed:", err)
-		respw.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	respw.Header().Set("Content-Type", "application/json")
-	respw.WriteHeader(http.StatusOK)
-	respw.Write(jsonResp)
 }
 
 func IsBlacklisted(ip string) bool {
