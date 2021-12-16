@@ -92,6 +92,7 @@ func (s *RpcEndPointServer) Start() {
 	http.HandleFunc("/", http.HandlerFunc(s.HandleHttpRequest))
 	http.HandleFunc("/health", http.HandlerFunc(s.handleHealthRequest))
 	http.HandleFunc("/bundle", http.HandlerFunc(s.HandleBundleRequest))
+	http.HandleFunc("/bundle/reset", http.HandlerFunc(s.HandleBundleResetRequest))
 
 	// Start serving
 	if err := http.ListenAndServe(s.listenAddress, nil); err != nil {
@@ -134,6 +135,22 @@ func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *
 	respw.Header().Set("Content-Type", "application/json")
 	respw.WriteHeader(http.StatusOK)
 	respw.Write(jsonResp)
+}
+
+func (s *RpcEndPointServer) HandleBundleResetRequest(respw http.ResponseWriter, req *http.Request) {
+	if req.Method != "POST" {
+		respw.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	bundleId := req.URL.Query().Get("id")
+	if bundleId == "" {
+		http.Error(respw, "no bundle id", http.StatusBadRequest)
+		return
+	}
+
+	RState.DelWhitehatBundleTx(bundleId)
+	respw.WriteHeader(http.StatusOK)
 }
 
 func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *http.Request) {

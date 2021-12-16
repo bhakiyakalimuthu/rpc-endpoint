@@ -216,6 +216,11 @@ func (s *RedisState) GetWhitehatBundleTx(bundleId string) ([]string, error) {
 	return s.RedisClient.LRange(context.Background(), key, 0, -1).Result()
 }
 
+func (s *RedisState) DelWhitehatBundleTx(bundleId string) error {
+	key := RedisKeyWhitehatBundleTransactions(bundleId)
+	return s.RedisClient.Del(context.Background(), key).Err()
+}
+
 //
 // Enable lookup of last txHash sent by txFrom
 //
