@@ -75,6 +75,8 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		err = RState.AddTxToWhitehatBundle(r.whitehatBundleId, r.rawTxHex)
 		if err != nil {
 			r.logError("[WhitehatBundleCollection] AddTxToWhitehatBundle failed:", err)
+			r.writeHeaderStatus(http.StatusInternalServerError)
+			return
 		}
 		r.writeRpcResult(r.tx.Hash().Hex())
 		return
