@@ -400,7 +400,8 @@ func TestWhitehatBundleCollection(t *testing.T) {
 
 func TestWhitehatBundleCollectionGetBalance(t *testing.T) {
 	resetTestServers()
-	url := testutils.RpcEndpointUrl + "?bundle=123"
+	bundleId := "123"
+	url := testutils.RpcEndpointUrl + "?bundle=" + bundleId
 
 	// sendRawTransaction adds tx to MM cache entry, to be used at later eth_getTransactionReceipt call
 	req_getTransactionCount := types.NewJsonRpcRequest(1, "eth_getBalance", []interface{}{testutils.TestTx_MM2_From, "latest"})
@@ -410,5 +411,19 @@ func TestWhitehatBundleCollectionGetBalance(t *testing.T) {
 	val := ""
 	err = json.Unmarshal(resp.Result, &val)
 	require.Nil(t, err, err)
-	require.Equal(t, "0xde0b6b3a7640000", val)
+	require.Equal(t, "0x487a9a304539440000", val)
+
+	// send tx
+	req_sendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_BundleFailedTooManyTimes_RawTx})
+	resp, err = utils.SendRpcAndParseResponseTo(url, req_sendRawTransaction)
+	require.Nil(t, err, err)
+	require.Nil(t, resp.Error, resp.Error)
+
+	// get balance again, should be +0.01 ETH
+	resp, err = utils.SendRpcAndParseResponseTo(url, req_getTransactionCount)
+	require.Nil(t, err, err)
+	require.Nil(t, resp.Error, resp.Error)
+	err = json.Unmarshal(resp.Result, &val)
+	require.Nil(t, err, err)
+	require.Equal(t, "0x487abdb737a9050000", val)
 }

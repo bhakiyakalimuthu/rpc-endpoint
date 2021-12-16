@@ -137,7 +137,13 @@ func (r *RpcRequest) process() {
 			r.writeRpcResult("1")
 			return
 		} else if r.isWhitehatBundleCollection && r.jsonReq.Method == "eth_getBalance" {
-			r.writeRpcResult("0xde0b6b3a7640000") // 1 eth in gwei
+			// set balance to 1337 + number of cached tx
+			balance := new(big.Int).Mul(big.NewInt(1337), big.NewInt(1e18))
+			txs, _ := RState.GetWhitehatBundleTx(r.whitehatBundleId)
+			addToBalance := new(big.Int).Mul(big.NewInt(int64(len(txs))), big.NewInt(1e16))
+			balance = new(big.Int).Add(balance, addToBalance)
+			balanceHex := fmt.Sprintf("0x%x", balance)
+			r.writeRpcResult(balanceHex)
 			return
 		}
 
