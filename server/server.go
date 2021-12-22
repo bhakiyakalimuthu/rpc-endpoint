@@ -137,6 +137,9 @@ func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *
 }
 
 func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *http.Request) {
+	respw.Header().Set("Access-Control-Allow-Origin", "*")
+	respw.Header().Set("Access-Control-Allow-Headers", "Accept,Content-Type")
+
 	bundleId := req.URL.Query().Get("id")
 	if bundleId == "" {
 		http.Error(respw, "no bundle id", http.StatusBadRequest)
