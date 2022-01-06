@@ -33,10 +33,11 @@ type RpcRequest struct {
 	relaySigningKey *ecdsa.PrivateKey
 
 	// extracted during request lifecycle:
-	origin   string
-	ip       string
-	body     []byte
-	jsonReq  *types.JsonRpcRequest
+	origin  string
+	ip      string
+	body    []byte
+	jsonReq *types.JsonRpcRequest
+
 	rawTxHex string
 	tx       *ethtypes.Transaction
 	txFrom   string
@@ -45,6 +46,10 @@ type RpcRequest struct {
 	respHeaderContentTypeWritten bool
 	respHeaderStatusCodeWritten  bool
 	respBodyWritten              bool
+
+	// Batch request
+	jsonBatchReq []*types.JsonRpcRequest // To handle batch request
+	handleBatch  bool
 }
 
 func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, relaySigningKey *ecdsa.PrivateKey) *RpcRequest {
@@ -109,13 +114,52 @@ func (r *RpcRequest) process() {
 		return
 	}
 
-	// Parse JSON RPC
-	if err = json.Unmarshal(r.body, &r.jsonReq); err != nil {
-		r.log("failed to parse JSON RPC request: %v - body: %s", err, r.body)
-		r.writeHeaderStatus(http.StatusBadRequest)
+	// Parse JSON RPC payload
+	if err = r.UnmarshalJSON(r.body); err != nil {
+		r.log("Parse payload %v", err)
 		return
 	}
+	r.processBatch()
+	// create wait group, to wait for the batch to complete
+	//wg := new(sync.WaitGroup)
 
+	//for _, req := range r.jsonBatchReq {
+	//wg.Add(1)
+	//	// spin up go routine to complete the batch in parallel
+	//	go func(wg *sync.WaitGroup, req *types.JsonRpcRequest) {
+	//		defer wg.Done()
+	//		r.jsonReq = req
+	//		r.processBatch()
+	//		// TODO(Bhaki): Handle response/error
+	//	}(wg, req)
+	//}
+	//wg.Wait()
+}
+
+// UnmarshalJSON implements json.Unmarshaler
+func (r *RpcRequest) UnmarshalJSON(b []byte) error {
+	if len(b) == 0 {
+		r.writeHeaderStatus(http.StatusBadRequest)
+		return fmt.Errorf("failed to parse JSON RPC request: no bytes to unmarshal - body: %s", r.body)
+	}
+	// See if we can guess based on the first character
+	switch b[0] {
+	case '{':
+		if err := json.Unmarshal(r.body, &r.jsonReq); err != nil {
+
+			r.writeHeaderStatus(http.StatusBadRequest)
+			return fmt.Errorf("failed to parse JSON RPC request: %v - body: %s", err, r.body)
+		}
+	case '[':
+		if err := json.Unmarshal(r.body, &r.jsonBatchReq); err != nil {
+			r.writeHeaderStatus(http.StatusBadRequest)
+			return fmt.Errorf("failed to parse JSON RPC Batch request: %v - body: %s", err, r.body)
+		}
+	}
+	return nil
+}
+
+func (r *RpcRequest) processBatch() {
 	r.log("JSON-RPC method: %s ip: %s", r.jsonReq.Method, r.ip)
 
 	if r.jsonReq.Method == "eth_sendRawTransaction" {
