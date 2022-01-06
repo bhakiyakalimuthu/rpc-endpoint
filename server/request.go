@@ -120,12 +120,12 @@ func (r *RpcRequest) process() {
 		return
 	}
 	r.processBatch()
-	// create wait group, to wait for the batch to complete
+	// Create wait group, to wait for the batch to complete
 	//wg := new(sync.WaitGroup)
 
 	//for _, req := range r.jsonBatchReq {
 	//wg.Add(1)
-	//	// spin up go routine to complete the batch in parallel
+	//	// Spin up go routine to complete the batch in parallel
 	//	go func(wg *sync.WaitGroup, req *types.JsonRpcRequest) {
 	//		defer wg.Done()
 	//		r.jsonReq = req
@@ -142,19 +142,24 @@ func (r *RpcRequest) UnmarshalJSON(b []byte) error {
 		r.writeHeaderStatus(http.StatusBadRequest)
 		return fmt.Errorf("failed to parse JSON RPC request: no bytes to unmarshal - body: %s", r.body)
 	}
-	// See if we can guess based on the first character
+	// Based on the first character decide single or multiple
 	switch b[0] {
+	// If payload with single request
 	case '{':
 		if err := json.Unmarshal(r.body, &r.jsonReq); err != nil {
 
 			r.writeHeaderStatus(http.StatusBadRequest)
 			return fmt.Errorf("failed to parse JSON RPC request: %v - body: %s", err, r.body)
 		}
+	// If payload with batch request
 	case '[':
 		if err := json.Unmarshal(r.body, &r.jsonBatchReq); err != nil {
 			r.writeHeaderStatus(http.StatusBadRequest)
 			return fmt.Errorf("failed to parse JSON RPC Batch request: %v - body: %s", err, r.body)
 		}
+	// If unsupported payload
+	default:
+		return fmt.Errorf("failed to parse JSON RPC request: unsupported payload %s", r.body)
 	}
 	return nil
 }
