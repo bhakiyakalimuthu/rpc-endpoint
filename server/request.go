@@ -119,21 +119,14 @@ func (r *RpcRequest) process() {
 		r.log("Parse payload %v", err)
 		return
 	}
-	r.processBatch()
-	// Create wait group, to wait for the batch to complete
-	//wg := new(sync.WaitGroup)
-
-	//for _, req := range r.jsonBatchReq {
-	//wg.Add(1)
-	//	// Spin up go routine to complete the batch in parallel
-	//	go func(wg *sync.WaitGroup, req *types.JsonRpcRequest) {
-	//		defer wg.Done()
-	//		r.jsonReq = req
-	//		r.processBatch()
-	//		// TODO(Bhaki): Handle response/error
-	//	}(wg, req)
-	//}
-	//wg.Wait()
+	if r.handleBatch {
+		for _, req := range r.jsonBatchReq {
+			r.jsonReq = req
+			r.processRequest(req)
+		}
+		return
+	}
+	r.processRequest(r.jsonReq)
 }
 
 // UnmarshalJSON implements json.Unmarshaler
@@ -157,6 +150,8 @@ func (r *RpcRequest) UnmarshalJSON(b []byte) error {
 			r.writeHeaderStatus(http.StatusBadRequest)
 			return fmt.Errorf("failed to parse JSON RPC Batch request: %v - body: %s", err, r.body)
 		}
+		// Set handle batch request
+		r.handleBatch = true
 	// If unsupported payload
 	default:
 		return fmt.Errorf("failed to parse JSON RPC request: unsupported payload %s", r.body)
@@ -164,10 +159,9 @@ func (r *RpcRequest) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (r *RpcRequest) processBatch() {
-	r.log("JSON-RPC method: %s ip: %s", r.jsonReq.Method, r.ip)
+func (r *RpcRequest) processRequest(req *types.JsonRpcRequest) {
 
-	if r.jsonReq.Method == "eth_sendRawTransaction" {
+	if req.Method == "eth_sendRawTransaction" {
 		r.handle_sendRawTransaction()
 
 	} else {
@@ -350,12 +344,11 @@ func (r *RpcRequest) sendTxToRelay() {
 		return
 	}
 
-	r.writeRpcResult(txHash)
 	r.log("[sendTxToRelay] sent %s", txHash)
 }
 
 // Sends cancel-tx to relay as cancelPrivateTransaction, if initial tx was sent there too.
-func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
+func (r *RpcRequest) handleCancelTx() bool {
 	cancelTxHash := strings.ToLower(r.tx.Hash().Hex())
 	txFromLower := strings.ToLower(r.txFrom)
 	r.log("[cancel-tx] %s - check %s/%d", cancelTxHash, txFromLower, r.tx.Nonce())
@@ -393,7 +386,6 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 	}
 
 	if cancelTxAlreadySentToRelay { // already sent
-		r.writeRpcResult(cancelTxHash)
 		return true
 	}
 
@@ -419,7 +411,6 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 		return true
 	}
 
-	r.writeRpcResult(cancelTxHash)
 	return true
 }
 
